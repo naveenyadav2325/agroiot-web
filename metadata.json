@@ -1,0 +1,6 @@
+{
+  "name": "AGRO-IOT",
+  "description": "Smart Farming. Smarter Decisions. Advanced AI-powered smart farming platform integrating real-time sensors, Edge AI crop diagnostics, smart irrigation, and environmental risk advisory.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
