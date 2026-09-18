@@ -217,6 +217,12 @@ export class DecisionEngine {
           'Shut down any automated fertigation or irrigation bypass lines.',
           'Elevate low-lying fruit trusses away from pooled soil moisture to prevent fungal rotting.',
         ],
+        whatNotToDo: [
+          'Do NOT run any additional irrigation or fertigation cycles.',
+          'Do NOT allow standing water to remain trapped around stem collars.',
+          'Do NOT operate heavy field equipment on saturated soil beds.',
+        ],
+        next24To48Hours: 'Monitor root zone aeration as water recedes. Check for fungal damping-off within 36 hours.',
         priority: 'Urgent',
         category: 'soil',
         timestamp: 'Just now',
@@ -257,6 +263,12 @@ export class DecisionEngine {
           'Apply an approved bio-fungicide protective spray early tomorrow morning.',
           'Do NOT irrigate over the canopy; keep foliage completely dry.',
         ],
+        whatNotToDo: [
+          'Do NOT use overhead sprinkler irrigation; splashing spreads fungal spores.',
+          'Do NOT compost infected foliage; bag and discard away from cultivated plots.',
+          'Do NOT apply excessive nitrogen fertilizers which promote soft, vulnerable tissue.',
+        ],
+        next24To48Hours: 'Re-inspect treated rows in 24 hours. Check adjacent buffer zones for chlorotic spot development.',
         priority: 'Urgent',
         category: 'disease',
         timestamp: 'Just now',
@@ -297,6 +309,12 @@ export class DecisionEngine {
           'Perform a brief morning micro-sprinkler misting pulse to lower ambient canopy temperature.',
           'Check soil moisture twice daily as evaporation rates are doubled.',
         ],
+        whatNotToDo: [
+          'Do NOT apply concentrated foliar fertilizer or oil sprays during peak midday heat.',
+          'Do NOT prune leaves during the hottest window; maintain protective canopy shading.',
+          'Do NOT flood dry soil suddenly with cold water to avoid root thermal shock.',
+        ],
+        next24To48Hours: 'Expect high daytime evaporative demand. Re-verify soil moisture readings at dusk and dawn.',
         priority: 'Urgent',
         category: 'climate',
         timestamp: 'Just now',
@@ -337,6 +355,12 @@ export class DecisionEngine {
           `Target approximately ${irrigation.recommendedLitersPerSqM} L/m² to replenish root zone.`,
           'Verify emitter drippers are free of silt or algae clogging.',
         ],
+        whatNotToDo: [
+          'Do NOT delay irrigation until foliage shows permanent wilting point signs.',
+          'Do NOT over-water beyond field capacity (avoid exceeding 75% soil moisture).',
+          'Do NOT irrigate late evening if humidity is above 80% to avoid fungal traps.',
+        ],
+        next24To48Hours: 'Recheck moisture levels 4 hours after cycle completion to confirm root-zone penetration depth.',
         priority: 'Moderate',
         category: 'irrigation',
         timestamp: 'Just now',
@@ -377,6 +401,12 @@ export class DecisionEngine {
           'Avoid handling wet foliage to prevent mechanical transfer of bacterial spots.',
           'Prepare biological protective copper soap spray if conditions persist tomorrow.',
         ],
+        whatNotToDo: [
+          'Do NOT irrigate late in the evening when canopy will remain wet overnight.',
+          'Do NOT work in field plots while foliage is wet with dew.',
+          'Do NOT crowd plant rows; maintain adequate airflow spacing.',
+        ],
+        next24To48Hours: 'High humidity is forecasted for the next 24 hours. Conduct morning leaf underside scouting.',
         priority: 'Moderate',
         category: 'disease',
         timestamp: 'Just now',
@@ -417,6 +447,12 @@ export class DecisionEngine {
         'Keep drip lines in auto-standby mode.',
         'Record any visual changes or flower counts via the Crop Scan tool.',
       ],
+      whatNotToDo: [
+        'Do NOT alter calibrated valve setpoints while metrics remain in target ranges.',
+        'Do NOT apply unnecessary chemical interventions during balanced conditions.',
+        'Do NOT neglect daily scouting even when telemetry reads optimal.',
+      ],
+      next24To48Hours: 'Weather forecast remains stable. Next automated sensor threshold evaluation scheduled in 6 hours.',
       priority: 'Informational',
       category: 'climate',
       timestamp: 'Just now',
@@ -463,12 +499,13 @@ export class DecisionEngine {
       alerts.push({
         id: 'alt-hw-disconnect',
         type: 'hardware',
-        severity: 'critical',
+        severity: 'CRITICAL',
+        source: 'Sensor',
         title: 'Sensor Gateway Disconnected',
-        reason: 'LoRa/Zigbee/WiFi telemetry heartbeat timed out. Real-time field telemetry is currently paused.',
-        recommendedAction: 'Verify field solar battery, gateway power supply, and wireless antenna orientation.',
+        message: 'LoRa/Zigbee/WiFi telemetry heartbeat timed out. Real-time field telemetry is currently paused.',
+        actionRecommended: 'Verify field solar battery, gateway power supply, and wireless antenna orientation.',
         timestamp: 'Just now',
-        read: false,
+        isRead: false,
       });
     }
 
@@ -477,23 +514,25 @@ export class DecisionEngine {
       alerts.push({
         id: `alt-ai-${latestAiScan.id}`,
         type: 'disease',
-        severity: latestAiScan.healthStatus === 'Advanced Disease' ? 'critical' : 'warning',
+        severity: latestAiScan.healthStatus === 'Advanced Disease' ? 'CRITICAL' : 'WARNING',
+        source: 'Edge AI',
         title: `Pathogen Detected: ${latestAiScan.possibleDisease}`,
-        reason: `Camera Edge AI inference detected symptomatic leaf lesions with ${latestAiScan.confidence}% confidence.`,
-        recommendedAction: latestAiScan.recommendation,
+        message: `Camera Edge AI inference detected symptomatic leaf lesions with ${latestAiScan.confidence}% confidence.`,
+        actionRecommended: latestAiScan.recommendation,
         timestamp: latestAiScan.timestamp,
-        read: false,
+        isRead: false,
       });
     } else if (risks.diseaseRisk === 'High') {
       alerts.push({
         id: 'alt-env-disease',
         type: 'disease',
-        severity: 'warning',
+        severity: 'WARNING',
+        source: 'Environmental Model',
         title: 'High Fungal Disease Incubation Risk',
-        reason: `Canopy microclimate (${sensor.temperature}°C, ${sensor.humidity}% RH) creates high leaf wetness duration index.`,
-        recommendedAction: 'Prune dense foliage to boost airflow and prepare organic preventative bio-fungicide.',
+        message: `Canopy microclimate (${sensor.temperature}°C, ${sensor.humidity}% RH) creates high leaf wetness duration index.`,
+        actionRecommended: 'Prune dense foliage to boost airflow and prepare organic preventative bio-fungicide.',
         timestamp: '10m ago',
-        read: false,
+        isRead: false,
       });
     }
 
@@ -502,23 +541,25 @@ export class DecisionEngine {
       alerts.push({
         id: 'alt-pest-ai',
         type: 'pest',
-        severity: 'warning',
+        severity: 'WARNING',
+        source: 'Edge AI',
         title: `Pest Infestation: ${latestAiScan.pestIndication}`,
-        reason: `Micro-webbing and chlorotic stippling identified via high-resolution crop inspection.`,
-        recommendedAction: latestAiScan.recommendation,
+        message: `Micro-webbing and chlorotic stippling identified via high-resolution crop inspection.`,
+        actionRecommended: latestAiScan.recommendation,
         timestamp: latestAiScan.timestamp,
-        read: false,
+        isRead: false,
       });
     } else if (risks.pestRisk === 'High') {
       alerts.push({
         id: 'alt-env-pest',
         type: 'pest',
-        severity: 'warning',
+        severity: 'WARNING',
+        source: 'Environmental Model',
         title: 'High Pest Propagation Climate',
-        reason: `Hot, dry ambient conditions (${sensor.temperature}°C, ${sensor.humidity}%) favor spider mite multiplication.`,
-        recommendedAction: 'Inspect underside of crown leaves and consider introducing beneficial predatory mites.',
+        message: `Hot, dry ambient conditions (${sensor.temperature}°C, ${sensor.humidity}%) favor spider mite multiplication.`,
+        actionRecommended: 'Inspect underside of crown leaves and consider introducing beneficial predatory mites.',
         timestamp: '15m ago',
-        read: false,
+        isRead: false,
       });
     }
 
@@ -527,12 +568,13 @@ export class DecisionEngine {
       alerts.push({
         id: 'alt-moisture-low',
         type: 'moisture',
-        severity: 'critical',
+        severity: 'CRITICAL',
+        source: 'Sensor',
         title: 'Low Soil Moisture Alert',
-        reason: `Soil moisture dropped to ${sensor.soilMoisture}%, violating the minimum configured threshold.`,
-        recommendedAction: `Execute scheduled drip irrigation (${irrigation.recommendedDurationMinutes} mins recommended).`,
+        message: `Soil moisture dropped to ${sensor.soilMoisture}%, violating the minimum configured threshold.`,
+        actionRecommended: `Execute scheduled drip irrigation (${irrigation.recommendedDurationMinutes} mins recommended).`,
         timestamp: '5m ago',
-        read: false,
+        isRead: false,
       });
     }
 
@@ -541,12 +583,13 @@ export class DecisionEngine {
       alerts.push({
         id: 'alt-heat-high',
         type: 'heat',
-        severity: 'critical',
+        severity: 'CRITICAL',
+        source: 'Sensor',
         title: 'High Canopy Heat Stress',
-        reason: `Ambient field temperature reached ${sensor.temperature}°C, triggering blossom drop danger.`,
-        recommendedAction: 'Deploy shade mesh netting and run short cooling mist cycles.',
+        message: `Ambient field temperature reached ${sensor.temperature}°C, triggering blossom drop danger.`,
+        actionRecommended: 'Deploy shade mesh netting and run short cooling mist cycles.',
         timestamp: '12m ago',
-        read: false,
+        isRead: false,
       });
     }
 
@@ -555,12 +598,13 @@ export class DecisionEngine {
       alerts.push({
         id: 'alt-flood-high',
         type: 'flood',
-        severity: 'critical',
+        severity: 'CRITICAL',
+        source: 'Sensor',
         title: 'Severe Waterlogging / Flood Warning',
-        reason: `Soil moisture at ${sensor.soilMoisture}% with water level at ${sensor.waterLevel}%. Root asphyxiation risk.`,
-        recommendedAction: 'Clear peripheral field drainage channels and verify furrow outflow immediately.',
+        message: `Soil moisture at ${sensor.soilMoisture}% with water level at ${sensor.waterLevel}%. Root asphyxiation risk.`,
+        actionRecommended: 'Clear peripheral field drainage channels and verify furrow outflow immediately.',
         timestamp: '2m ago',
-        read: false,
+        isRead: false,
       });
     }
 
