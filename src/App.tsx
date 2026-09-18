@@ -69,8 +69,11 @@ const MainAppContent: React.FC = () => {
     <div className="min-h-screen bg-[#040e0a] text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-slate-950 font-sans">
       {/* Global Application Header */}
       <Header
-        onOpenDemoControls={() => setIsDemoModalOpen(true)}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onOpenSidebar={() => setIsSidebarOpen(true)}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        onOpenDemoControls={() => setIsDemoModalOpen(true)}
       />
 
       {/* Main Layout Container */}

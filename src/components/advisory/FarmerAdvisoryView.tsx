@@ -25,12 +25,15 @@ export const FarmerAdvisoryView: React.FC = () => {
   const localizedContent = {
     en: {
       langName: 'English',
-      headline: advisory.title,
-      summary: advisory.summary,
-      why: advisory.whyThisAlert,
-      whatToDo: advisory.whatShouldIDo,
-      whatNotToDo: advisory.whatNotToDo,
-      next48: advisory.next24To48Hours,
+      headline: advisory.title || 'Field Advisory',
+      summary: advisory.summary || 'Monitoring ongoing field conditions.',
+      why: advisory.whyThisAlert || 'Based on real-time environmental telemetry.',
+      whatToDo: advisory.whatShouldIDo || [],
+      whatNotToDo: advisory.whatNotToDo || [
+        'Do not alter calibrated irrigation parameters prematurely.',
+        'Do not apply concentrated foliar sprays under direct intense sun.',
+      ],
+      next48: advisory.next24To48Hours || 'Conditions will remain under continuous monitoring over the next 24-48 hours.',
     },
     hi: {
       langName: 'हिंदी (Hindi)',
@@ -243,7 +246,7 @@ export const FarmerAdvisoryView: React.FC = () => {
           </div>
           <div className="p-4 rounded-xl bg-[#04120d] border border-emerald-950/80">
             <ul className="space-y-2.5">
-              {current.whatToDo.map((action: string, i: number) => (
+              {(current.whatToDo || []).map((action: string, i: number) => (
                 <li key={i} className="flex items-start gap-3 text-sm text-slate-200">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                   <span className="leading-relaxed">{action}</span>
@@ -263,7 +266,7 @@ export const FarmerAdvisoryView: React.FC = () => {
           </div>
           <div className="p-4 rounded-xl bg-[#04120d] border border-emerald-950/80">
             <ul className="space-y-2.5">
-              {current.whatNotToDo.map((caution: string, i: number) => (
+              {(current.whatNotToDo || []).map((caution: string, i: number) => (
                 <li key={i} className="flex items-start gap-3 text-sm text-slate-200">
                   <XCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
                   <span className="leading-relaxed">{caution}</span>

@@ -16,21 +16,24 @@ import { DemoScenario } from '../../types';
 import { AgroIotLogo } from '../common/AgroIotLogo';
 
 interface HeaderProps {
-  onOpenSidebar: () => void;
+  onOpenSidebar?: () => void;
+  onToggleSidebar?: () => void;
   onOpenDemoControls: () => void;
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenSidebar,
+  onToggleSidebar,
   onOpenDemoControls,
-  activeTab,
+  activeTab = 'dashboard',
   setActiveTab,
 }) => {
   const {
     hardwareStatus,
     hardwareProtocol,
+    backendOnline,
     mode,
     scenario,
     setScenario,
@@ -41,6 +44,9 @@ export const Header: React.FC<HeaderProps> = ({
     pingMs,
     edgeSpecs,
   } = useFarm();
+
+  const handleSidebarToggle = onOpenSidebar || onToggleSidebar || (() => {});
+  const handleNavigate = setActiveTab || (() => {});
 
   const scenarios: { key: DemoScenario; label: string }[] = [
     { key: 'NORMAL', label: 'Normal' },
@@ -58,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-3">
           <button
             id="mobile-sidebar-toggle-btn"
-            onClick={onOpenSidebar}
+            onClick={handleSidebarToggle}
             className="lg:hidden p-2 rounded-lg bg-emerald-950/60 border border-emerald-800/40 text-emerald-400 hover:bg-emerald-900/60 transition"
             aria-label="Open Navigation"
           >
@@ -66,7 +72,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('landing')}
+            onClick={() => handleNavigate('landing')}
             className="text-left group cursor-pointer"
             title="Go to AGRO-IOT Home"
           >
@@ -76,6 +82,18 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Center: Real-time Telemetry & Edge Intelligence Indicators */}
         <div className="hidden xl:flex items-center gap-3">
+          {/* Backend API status pill */}
+          <div
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono border transition ${
+              backendOnline
+                ? 'bg-emerald-950/40 border-emerald-700/50 text-emerald-300'
+                : 'bg-slate-900/60 border-slate-700/50 text-slate-400'
+            }`}
+          >
+            <span className={`inline-block w-1.5 h-1.5 rounded-full ${backendOnline ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+            <span>{backendOnline ? 'API: ONLINE' : 'API: DISCONNECTED'}</span>
+          </div>
+
           {/* Hardware status pill */}
           <div
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition ${
@@ -212,7 +230,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Alerts Notification Bell */}
           <button
             id="header-alerts-btn"
-            onClick={() => setActiveTab('alerts')}
+            onClick={() => handleNavigate('alerts')}
             className={`relative p-2 rounded-lg border transition ${
               unreadAlertsCount > 0
                 ? 'bg-amber-950/40 border-amber-600/50 text-amber-300 hover:bg-amber-900/50'

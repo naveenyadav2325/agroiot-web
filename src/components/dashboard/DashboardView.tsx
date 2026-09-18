@@ -49,7 +49,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // Audio Speech Synthesis for Farmer Advisory
   const handleSpeakAdvisory = () => {
-    if (!('speechSynthesis' in window)) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window) || !window.speechSynthesis) {
       alert('Speech synthesis is not supported on this device/browser.');
       return;
     }
@@ -60,7 +60,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       return;
     }
 
-    const speechText = `${advisory.title}. ${advisory.summary}. Why this alert? ${advisory.whyThisAlert}. Action recommended: ${advisory.whatShouldIDo.join('. ')}`;
+    const actions = (advisory.whatShouldIDo || []).join('. ');
+    const speechText = `${advisory.title || ''}. ${advisory.summary || ''}. Why this alert? ${advisory.whyThisAlert || ''}. Action recommended: ${actions}`;
     const utterance = new SpeechSynthesisUtterance(speechText);
     utterance.rate = 0.95;
     utterance.pitch = 1.0;
@@ -456,7 +457,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Recommended Action Plan:
               </span>
               <ul className="space-y-1.5">
-                {advisory.whatShouldIDo.map((act, i) => (
+                {(advisory.whatShouldIDo || []).map((act, i) => (
                   <li key={i} className="flex items-start gap-2.5 text-xs text-slate-300">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                     <span>{act}</span>

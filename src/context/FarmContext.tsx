@@ -15,12 +15,15 @@ import {
 import { EdgeModelSpecs } from '../services/adapters/AIInferenceAdapter';
 import { MockEdgeAIAdapter } from '../services/adapters/MockEdgeAIAdapter';
 import { MockSensorAdapter } from '../services/adapters/MockSensorAdapter';
+import { HttpSensorAdapter } from '../services/adapters/HttpSensorAdapter';
 import { DecisionEngine } from '../services/engine/DecisionEngine';
 
 interface FarmContextType {
   sensorData: SensorData;
   hardwareStatus: HardwareStatus;
   hardwareProtocol: HardwareProtocol;
+  backendOnline: boolean;
+  hasTelemetry: boolean;
   mode: 'LIVE' | 'DEMO';
   scenario: DemoScenario;
   crop: CropProfile;
@@ -50,6 +53,7 @@ interface FarmContextType {
   runCropScan: (imageSource: string | File, presetKey?: string) => Promise<AIInferenceResult>;
   markAlertAsRead: (id: string) => void;
   markAllAlertsAsRead: () => void;
+  clearAlerts: () => void;
   dismissAlert: (id: string) => void;
   toggleValve: (valve: 1 | 2) => void;
 }
@@ -77,16 +81,19 @@ const defaultThresholds: ThresholdConfig = {
   waterLevelWarning: 80,
 };
 
-const sensorAdapter = new MockSensorAdapter();
+const mockSensorAdapter = new MockSensorAdapter();
+const httpSensorAdapter = new HttpSensorAdapter();
 const edgeAdapter = new MockEdgeAIAdapter();
 
 const FarmContext = createContext<FarmContextType | null>(null);
 
 export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [sensorData, setSensorData] = useState<SensorData>(sensorAdapter.getLatestData());
-  const [hardwareStatus, setHardwareStatusState] = useState<HardwareStatus>(sensorAdapter.getConnectionStatus());
-  const [hardwareProtocol, setHardwareProtocolState] = useState<HardwareProtocol>(sensorAdapter.getProtocol());
-  const [mode, setMode] = useState<'LIVE' | 'DEMO'>('DEMO');
+  const [mode, setModeState] = useState<'LIVE' | 'DEMO'>('DEMO');
+  const [sensorData, setSensorData] = useState<SensorData>(mockSensorAdapter.getLatestData());
+  const [hardwareStatus, setHardwareStatusState] = useState<HardwareStatus>(mockSensorAdapter.getConnectionStatus());
+  const [hardwareProtocol, setHardwareProtocolState] = useState<HardwareProtocol>(mockSensorAdapter.getProtocol());
+  const [backendOnline, setBackendOnline] = useState<boolean>(false);
+  const [hasTelemetry, setHasTelemetry] = useState<boolean>(true);
   const [scenario, setScenarioState] = useState<DemoScenario>('NORMAL');
   const [crop, setCrop] = useState<CropProfile>(defaultCrop);
   const [thresholds, setThresholds] = useState<ThresholdConfig>(defaultThresholds);
@@ -99,39 +106,89 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [valve1Manual, setValve1Manual] = useState<'OPEN' | 'CLOSED' | null>(null);
   const [valve2Manual, setValve2Manual] = useState<'OPEN' | 'CLOSED' | null>(null);
 
-  // Initialize sensor adapter
+  // Active adapter reference based on mode
+  const activeAdapter = mode === 'LIVE' ? httpSensorAdapter : mockSensorAdapter;
+
+  // Initialize adapters
   useEffect(() => {
-    sensorAdapter.init();
+    mockSensorAdapter.init();
+    httpSensorAdapter.init();
     edgeAdapter.init();
 
-    const unsubscribe = sensorAdapter.subscribe((data) => {
-      setSensorData(data);
-      setHardwareStatusState(sensorAdapter.getConnectionStatus());
+    // Check backend health
+    httpSensorAdapter.simulatePing().then((ms) => {
+      setBackendOnline(ms > 0);
+    }).catch(() => {
+      setBackendOnline(false);
     });
 
-    // Initial ping simulation check
-    sensorAdapter.simulatePing().then((ms) => setPingMs(ms)).catch(() => setPingMs(0));
-
     // Pre-populate with initial healthy scan history item
-    const initialScan = edgeAdapter.sampleLeaves[1].result;
-    setScanHistory([initialScan]);
+    if (edgeAdapter.sampleLeaves && edgeAdapter.sampleLeaves[1]) {
+      const initialScan = edgeAdapter.sampleLeaves[1].result;
+      setScanHistory([initialScan]);
+    }
+  }, []);
+
+  // Subscribe to active adapter updates
+  useEffect(() => {
+    const adapter = mode === 'LIVE' ? httpSensorAdapter : mockSensorAdapter;
+    setSensorData(adapter.getLatestData());
+    setHardwareStatusState(adapter.getConnectionStatus());
+    setHardwareProtocolState(adapter.getProtocol());
+
+    if (mode === 'LIVE') {
+      setHasTelemetry(httpSensorAdapter.hasTelemetry());
+      setBackendOnline(httpSensorAdapter.isBackendOnline());
+    } else {
+      setHasTelemetry(true);
+    }
+
+    const unsubscribe = adapter.subscribe((data) => {
+      setSensorData(data);
+      setHardwareStatusState(adapter.getConnectionStatus());
+      if (mode === 'LIVE') {
+        setHasTelemetry(httpSensorAdapter.hasTelemetry());
+        setBackendOnline(httpSensorAdapter.isBackendOnline());
+      }
+    });
+
+    adapter.simulatePing().then((ms) => setPingMs(ms)).catch(() => setPingMs(0));
 
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [mode]);
+
+  const setMode = (newMode: 'LIVE' | 'DEMO') => {
+    setModeState(newMode);
+    if (newMode === 'LIVE') {
+      httpSensorAdapter.fetchLatestTelemetry().then(() => {
+        setSensorData(httpSensorAdapter.getLatestData());
+        setHardwareStatusState(httpSensorAdapter.getConnectionStatus());
+        setHasTelemetry(httpSensorAdapter.hasTelemetry());
+        setBackendOnline(httpSensorAdapter.isBackendOnline());
+      }).catch(() => {
+        setHardwareStatusState('disconnected');
+        setBackendOnline(false);
+        setHasTelemetry(false);
+      });
+    } else {
+      setSensorData(mockSensorAdapter.getLatestData());
+      setHardwareStatusState(mockSensorAdapter.getConnectionStatus());
+      setHasTelemetry(true);
+    }
+  };
 
   // Update scenario
   const setScenario = (newScenario: DemoScenario) => {
     setScenarioState(newScenario);
-    sensorAdapter.setScenario(newScenario);
+    mockSensorAdapter.setScenario(newScenario);
 
-    // If switching to disease scenario, pre-link scan context if not already scanned
-    if (newScenario === 'DISEASE_ALERT') {
+    if (newScenario === 'DISEASE_ALERT' && edgeAdapter.sampleLeaves[0]) {
       const diseaseScan = edgeAdapter.sampleLeaves[0].result;
       setLatestScan(diseaseScan);
       setScanHistory((prev) => [diseaseScan, ...prev.filter((item) => item.id !== diseaseScan.id)]);
-    } else if (newScenario === 'PEST_ALERT') {
+    } else if (newScenario === 'PEST_ALERT' && edgeAdapter.sampleLeaves[2]) {
       const pestScan = edgeAdapter.sampleLeaves[2].result;
       setLatestScan(pestScan);
       setScanHistory((prev) => [pestScan, ...prev.filter((item) => item.id !== pestScan.id)]);
@@ -140,9 +197,9 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const setHardwareStatus = (status: HardwareStatus) => {
     setHardwareStatusState(status);
-    sensorAdapter.setConnectionStatus(status);
+    activeAdapter.setConnectionStatus(status);
     if (status === 'connected') {
-      sensorAdapter.simulatePing().then((ms) => setPingMs(ms)).catch(() => setPingMs(0));
+      activeAdapter.simulatePing().then((ms) => setPingMs(ms)).catch(() => setPingMs(0));
     } else {
       setPingMs(0);
     }
@@ -150,19 +207,19 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const setProtocol = (protocol: HardwareProtocol) => {
     setHardwareProtocolState(protocol);
-    sensorAdapter.setProtocol(protocol);
-    sensorAdapter.simulatePing().then((ms) => setPingMs(ms)).catch(() => setPingMs(0));
+    activeAdapter.setProtocol(protocol);
+    activeAdapter.simulatePing().then((ms) => setPingMs(ms)).catch(() => setPingMs(0));
   };
 
   const reconnectHardware = async () => {
-    await sensorAdapter.connect();
-    setHardwareStatusState('connected');
-    const ms = await sensorAdapter.simulatePing();
+    await activeAdapter.connect();
+    setHardwareStatusState(activeAdapter.getConnectionStatus());
+    const ms = await activeAdapter.simulatePing();
     setPingMs(ms);
   };
 
   const disconnectHardware = async () => {
-    await sensorAdapter.disconnect();
+    await activeAdapter.disconnect();
     setHardwareStatusState('disconnected');
     setPingMs(0);
   };
@@ -208,10 +265,10 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     setAlerts((prevAlerts) => {
-      const existingMap = new Map(prevAlerts.map((a) => [a.id, a]));
+      const existingMap = new Map<string, AlertItem>(prevAlerts.map((a) => [a.id, a]));
       return generated.map((gen) => {
         const existing = existingMap.get(gen.id);
-        return existing ? { ...gen, read: existing.read } : gen;
+        return existing ? { ...gen, isRead: existing.isRead } : gen;
       });
     });
   }, [sensorData, riskAssessment, irrigationDecision, hardwareStatus, latestScan]);
@@ -229,11 +286,15 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const markAlertAsRead = (id: string) => {
-    setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, read: true } : a)));
+    setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, isRead: true } : a)));
   };
 
   const markAllAlertsAsRead = () => {
-    setAlerts((prev) => prev.map((a) => ({ ...a, read: true })));
+    setAlerts((prev) => prev.map((a) => ({ ...a, isRead: true })));
+  };
+
+  const clearAlerts = () => {
+    setAlerts([]);
   };
 
   const dismissAlert = (id: string) => {
@@ -248,7 +309,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const unreadAlertsCount = alerts.filter((a) => !a.read).length;
+  const unreadAlertsCount = alerts.filter((a) => !a.isRead).length;
 
   return (
     <FarmContext.Provider
@@ -256,6 +317,8 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sensorData,
         hardwareStatus,
         hardwareProtocol,
+        backendOnline,
+        hasTelemetry,
         mode,
         scenario,
         crop,
@@ -283,6 +346,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         runCropScan,
         markAlertAsRead,
         markAllAlertsAsRead,
+        clearAlerts,
         dismissAlert,
         toggleValve,
       }}
